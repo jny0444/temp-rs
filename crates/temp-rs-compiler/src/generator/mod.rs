@@ -49,3 +49,38 @@ pub extern "C" fn __repl_eval(_ctx: *mut std::ffi::c_void) {
     }
     out.push_str("}\n");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::generate_source;
+    use crate::parser::InputKind;
+
+    #[test]
+    fn item_emits_empty_eval() {
+        let src = generate_source(&InputKind::Item("fn foo() {}".into()), &[]);
+        assert!(src.contains("fn foo() {}"));
+        assert!(src.contains("fn __repl_eval"));
+        assert!(src.contains("#[no_mangle]"));
+    }
+
+    #[test]
+    fn history_is_prepended() {
+        let src = generate_source(
+            &InputKind::Expression("foo()".into()),
+            &["fn foo() -> i32 { 1 }".into()],
+        );
+        let foo = src.find("fn foo()").unwrap();
+        let eval = src.find("fn __repl_eval").unwrap();
+        assert!(foo < eval);
+        assert!(src.contains("let __repl_val"));
+        assert!(src.contains("println!"));
+    }
+
+    #[test]
+    fn statement_body_is_inside_eval() {
+        let src = generate_source(&InputKind::Statement("let x = 1".into()), &[]);
+        let eval = src.find("fn __repl_eval").unwrap();
+        let let_pos = src.find("let x = 1").unwrap();
+        assert!(let_pos > eval);
+    }
+}

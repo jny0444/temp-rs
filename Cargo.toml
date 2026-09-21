@@ -1,17 +1,17 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/temp-rs-dylib-loader",
-    "crates/temp-rs-compiler",
-    "crates/temp-rs-core",
-    "crates/temp-rs-cli",
+  "crates/temp-rs-dylib-loader",
+  "crates/temp-rs-compiler",
+  "crates/temp-rs-core",
+  "crates/temp-rs-cli",
 ]
 
 [workspace.dependencies]
 tempfile = "3.27.0"
 libc = "1.0.0-alpha.4"
-anyhow = "1"
-syn = { version = "2", features = ["full"] }
+anyhow = "1.0.104"
+syn = { version = "3.0.6", features = ["full"] }
 
 temp-rs-dylib-loader = { path = "crates/temp-rs-dylib-loader" }
 temp-rs-compiler = { path = "crates/temp-rs-compiler" }
