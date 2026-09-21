@@ -1,8 +1,13 @@
-[package]
-name = "temp-rs"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+resolver = "2"
+members = [
+    "crates/temp-rs-dylib-loader",
+    "crates/temp-rs-compiler",
+    "crates/temp-rs-core",
+    "crates/temp-rs-cli",
+]
 
-[dependencies]
-libc = "1.0.0-alpha.4"
+[workspace.dependencies]
 tempfile = "3.27.0"
+libc = "1.0.0-alpha.4"
+thiserror = "2.0.20"

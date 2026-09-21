@@ -1,3 +1,5 @@
+// Having them here just for reference purposes, using the bindings provided by libc
+
 use std::ffi::{c_char, c_int, c_void};
 
 unsafe extern "C" {

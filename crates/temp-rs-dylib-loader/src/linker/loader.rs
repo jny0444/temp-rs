@@ -1,7 +1,8 @@
 use std::{
-    ffi::{CStr, CString, c_void},
+    ffi::{CStr, CString, c_char, c_void},
     io::{Error, ErrorKind, Result},
-    mem::transmute_copy,
+    mem::{size_of, transmute_copy},
+    os::unix::ffi::OsStrExt,
     path::Path,
 };
 
@@ -13,11 +14,7 @@ pub struct MiniLoader {
 
 impl MiniLoader {
     pub fn open(path: &Path) -> Result<Self> {
-        let c_path = CString::new(
-            path.to_str()
-                .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "Invalid path"))?,
-        )
-        .map_err(|e| {
+        let c_path = CString::new(path.as_os_str().as_bytes()).map_err(|e| {
             Error::new(
                 ErrorKind::InvalidInput,
                 format!("CString conversion error: {e}"),
@@ -39,6 +36,13 @@ impl MiniLoader {
     }
 
     pub unsafe fn get_symbol<T>(&self, name: &str) -> Result<T> {
+        if size_of::<T>() != size_of::<*mut c_void>() {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "symbol type must be pointer-sized",
+            ));
+        }
+
         let c_name = CString::new(name).map_err(|e| {
             Error::new(ErrorKind::InvalidInput, format!("Invalid symbol name: {e}"))
         })?;
@@ -53,7 +57,7 @@ impl MiniLoader {
         if !err.is_null() {
             return Err(Error::other(format!(
                 "dlsym failed: {}",
-                Self::last_error()
+                Self::error_message(err)
             )));
         }
         if symbol_ptr.is_null() {
@@ -68,23 +72,17 @@ impl MiniLoader {
     }
 
     fn last_error() -> String {
-        unsafe {
-            let err_ptr = dlerror();
-            if err_ptr.is_null() {
-                "Unknown dlerror".to_string()
-            } else {
-                CStr::from_ptr(err_ptr).to_string_lossy().into_owned()
-            }
-        }
+        let err_ptr = unsafe { dlerror() };
+        Self::error_message(err_ptr)
     }
-}
 
-impl Drop for MiniLoader {
-    fn drop(&mut self) {
-        if !self.handle.is_null() {
-            unsafe {
-                dlclose(self.handle);
-            }
+    fn error_message(err_ptr: *mut c_char) -> String {
+        if err_ptr.is_null() {
+            "Unknown dlerror".to_string()
+        } else {
+            unsafe { CStr::from_ptr(err_ptr) }
+                .to_string_lossy()
+                .into_owned()
         }
     }
 }
