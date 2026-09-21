@@ -3,12 +3,12 @@
 
 use std::{
     ffi::{CStr, CString, c_char, c_void},
-    io::{Error, ErrorKind, Result},
     mem::{size_of, transmute_copy},
     os::unix::ffi::OsStrExt,
     path::Path,
 };
 
+use anyhow::{Context, Result, bail};
 use libc::{RTLD_GLOBAL, RTLD_LAZY, dlerror, dlopen, dlsym};
 
 pub struct MiniLoader {
@@ -17,12 +17,8 @@ pub struct MiniLoader {
 
 impl MiniLoader {
     pub fn open(path: &Path) -> Result<Self> {
-        let c_path = CString::new(path.as_os_str().as_bytes()).map_err(|e| {
-            Error::new(
-                ErrorKind::InvalidInput,
-                format!("CString conversion error: {e}"),
-            )
-        })?;
+        let c_path = CString::new(path.as_os_str().as_bytes())
+            .with_context(|| format!("invalid library path: {}", path.display()))?;
 
         unsafe {
             dlerror();
@@ -31,8 +27,11 @@ impl MiniLoader {
         let handle = unsafe { dlopen(c_path.as_ptr(), RTLD_LAZY | RTLD_GLOBAL) };
 
         if handle.is_null() {
-            let err_msg = Self::last_error();
-            return Err(Error::other(format!("dlopen failed: {err_msg}")));
+            bail!(
+                "failed to load '{}': {}",
+                path.display(),
+                Self::last_error()
+            );
         }
 
         Ok(Self { handle })
@@ -40,15 +39,10 @@ impl MiniLoader {
 
     pub unsafe fn get_symbol<T>(&self, name: &str) -> Result<T> {
         if size_of::<T>() != size_of::<*mut c_void>() {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "symbol type must be pointer-sized",
-            ));
+            bail!("requested symbol type is not pointer-sized");
         }
 
-        let c_name = CString::new(name).map_err(|e| {
-            Error::new(ErrorKind::InvalidInput, format!("Invalid symbol name: {e}"))
-        })?;
+        let c_name = CString::new(name).with_context(|| format!("invalid symbol name: {name}"))?;
 
         unsafe {
             dlerror();
@@ -58,16 +52,10 @@ impl MiniLoader {
 
         let err = unsafe { dlerror() };
         if !err.is_null() {
-            return Err(Error::other(format!(
-                "dlsym failed: {}",
-                Self::error_message(err)
-            )));
+            bail!("symbol `{name}` not found: {}", Self::error_message(err));
         }
         if symbol_ptr.is_null() {
-            return Err(Error::new(
-                ErrorKind::InvalidData,
-                format!("Symbol '{name}' resolved to null"),
-            ));
+            bail!("symbol `{name}` resolved to a null pointer");
         }
 
         let func: T = unsafe { transmute_copy(&symbol_ptr) };
