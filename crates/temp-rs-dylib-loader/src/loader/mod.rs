@@ -1,3 +1,6 @@
+// Not used, using the bindings provided by libc
+// pub mod c_ffi;
+
 use std::{
     ffi::{CStr, CString, c_char, c_void},
     io::{Error, ErrorKind, Result},
@@ -6,7 +9,7 @@ use std::{
     path::Path,
 };
 
-use libc::{RTLD_GLOBAL, RTLD_LAZY, dlclose, dlerror, dlopen, dlsym};
+use libc::{RTLD_GLOBAL, RTLD_LAZY, dlerror, dlopen, dlsym};
 
 pub struct MiniLoader {
     handle: *mut c_void,
