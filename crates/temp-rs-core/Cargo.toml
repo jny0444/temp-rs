@@ -2,3 +2,9 @@
 name = "temp-rs-core"
 version = "0.1.0"
 edition = "2024"
+
+[dependencies]
+anyhow.workspace = true
+tempfile.workspace = true
+temp-rs-compiler.workspace = true
+temp-rs-dylib-loader.workspace = true

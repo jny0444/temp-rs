@@ -15,3 +15,4 @@ syn = { version = "2", features = ["full"] }
 
 temp-rs-dylib-loader = { path = "crates/temp-rs-dylib-loader" }
 temp-rs-compiler = { path = "crates/temp-rs-compiler" }
+temp-rs-core = { path = "crates/temp-rs-core" }
