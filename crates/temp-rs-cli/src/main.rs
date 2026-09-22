@@ -1,4 +1,4 @@
-use std::{iter::Peekable, mem::take, str::Chars};
+use std::{env, iter::Peekable, mem::take, path::PathBuf, str::Chars};
 
 use anyhow::Result;
 use rustyline::DefaultEditor;
@@ -7,6 +7,10 @@ use temp_rs_core::Engine;
 fn main() -> Result<()> {
     let mut engine = Engine::new()?;
     let mut rl = DefaultEditor::new()?;
+    let history_file = history_path();
+    if let Some(path) = history_file.as_ref() {
+        let _ = rl.load_history(path);
+    }
     let mut pending = String::new();
 
     loop {
@@ -38,6 +42,7 @@ fn main() -> Result<()> {
                 continue;
             }
             Err(rustyline::error::ReadlineError::Eof) => {
+                println!();
                 break;
             }
             Err(err) => {
@@ -47,7 +52,15 @@ fn main() -> Result<()> {
         }
     }
 
+    if let Some(path) = history_file.as_ref() {
+        let _ = rl.save_history(path);
+    }
     Ok(())
+}
+
+fn history_path() -> Option<PathBuf> {
+    let home = env::var_os("HOME")?;
+    Some(PathBuf::from(home).join(".temp-rs_history"))
 }
 
 fn input_needs_more(src: &str) -> bool {
@@ -297,7 +310,15 @@ fn consume_escape(chars: &mut Peekable<Chars<'_>>) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::input_needs_more;
+    use super::{history_path, input_needs_more};
+
+    #[test]
+    fn history_file_is_under_home() {
+        let Some(path) = history_path() else {
+            return;
+        };
+        assert!(path.ends_with(".temp-rs_history"), "{}", path.display());
+    }
 
     #[test]
     fn waits_after_outer_attribute() {

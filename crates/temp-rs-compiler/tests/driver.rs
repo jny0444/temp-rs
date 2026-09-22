@@ -44,4 +44,6 @@ fn compile_cdylib_surfaces_rustc_errors() {
     let err = compile_cdylib("fn broken(", 0, dir.path()).unwrap_err();
     let msg = format!("{err}");
     assert!(msg.contains("error"), "{msg}");
+    assert!(!msg.contains("eval_0.rs"), "{msg}");
+    assert!(msg.contains("<repl>"), "{msg}");
 }

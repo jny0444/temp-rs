@@ -19,7 +19,8 @@ fn history_is_prepended() {
     let foo = src.find("fn foo()").unwrap();
     let eval = src.find("fn __repl_eval").unwrap();
     assert!(foo < eval);
-    assert!(src.contains("let __repl_val"));
+    assert!(src.contains("__repl_print"));
+    assert!(src.contains("type_name"));
     assert!(src.contains("println!"));
 }
 
@@ -53,7 +54,7 @@ fn assignments_are_replayed_after_lets() {
     );
     let let_pos = src.find("let mut a = 3").unwrap();
     let assign_pos = src.find("a = 4").unwrap();
-    let use_pos = src.find("let __repl_val").unwrap();
+    let use_pos = src.find("__repl_print({").unwrap();
     assert!(let_pos < assign_pos);
     assert!(assign_pos < use_pos);
 }
@@ -68,4 +69,26 @@ fn method_calls_are_replayed() {
     let let_pos = src.find("let mut a = vec![1]").unwrap();
     let push_pos = src.find("a.push(2)").unwrap();
     assert!(let_pos < push_pos);
+}
+
+#[test]
+fn unit_expressions_skip_debug_print() {
+    let src = generate_source(&InputKind::Expression("()".into()), &[], &[]);
+    assert!(src.contains(r#"type_name::<T>() != "()""#));
+    assert!(!src.contains("{__repl_val:?}"));
+    assert_eq!(
+        src.snippet_start_line,
+        src.lines().position(|l| l.trim() == "()").unwrap() + 1
+    );
+}
+
+#[test]
+fn snippet_start_is_the_user_item() {
+    let src = generate_source(
+        &InputKind::Item("fn foo() {}".into()),
+        &["struct A;".into()],
+        &[],
+    );
+    let line = src.lines().nth(src.snippet_start_line - 1).unwrap();
+    assert!(line.contains("fn foo()"), "{line}");
 }

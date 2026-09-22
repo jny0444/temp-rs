@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use temp_rs_compiler::{
-    driver::compile_cdylib,
+    driver::{compile_cdylib, compile_cdylib_mapped},
     generator::generate_source,
     parser::{InputKind, classify_input, is_persistent_binding, item_keys},
 };
@@ -57,13 +57,18 @@ pub extern "C" fn __repl_eval(_ctx: *mut std::ffi::c_void) {}
             _ => self.item_history.as_slice(),
         };
 
-        let source = generate_source(&kind, items, &self.binding_history);
+        let generated = generate_source(&kind, items, &self.binding_history);
 
         // The published dylib keeps a stable inode. Unmap it before that file
         // is overwritten, or dyld will keep executing the previous mapping.
         self.loader.take();
 
-        let artifact = compile_cdylib(&source, self.counter, self.scratch_dir.path())?;
+        let artifact = compile_cdylib_mapped(
+            &generated.source,
+            self.counter,
+            self.scratch_dir.path(),
+            generated.snippet_start_line,
+        )?;
         self.counter += 1;
 
         let loader = MiniLoader::open(&artifact.dylib_path)?;

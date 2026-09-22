@@ -83,3 +83,18 @@ fn eval_compile_error() {
         "{err}"
     );
 }
+
+#[test]
+fn eval_compile_error_points_at_snippet() {
+    let mut engine = Engine::new().unwrap();
+    let err = engine.eval(r#"1 + "a""#).unwrap_err();
+    let msg = format!("{err}");
+    assert!(!msg.contains("eval_"), "{msg}");
+    assert!(msg.contains("<repl>:1:"), "{msg}");
+}
+
+#[test]
+fn eval_unit_expression_succeeds() {
+    let mut engine = Engine::new().unwrap();
+    engine.eval("()").unwrap();
+}
