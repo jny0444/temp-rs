@@ -1,4 +1,4 @@
-use temp_rs_compiler::parser::{InputKind, classify_input};
+use temp_rs_compiler::parser::{InputKind, ItemKey, classify_input, item_keys};
 
 fn item(src: &str) -> InputKind {
     InputKind::Item(src.trim().to_string())
@@ -70,4 +70,20 @@ fn classifies_expressions() {
         classify_input("if true { 1 } else { 2 }"),
         expr("if true { 1 } else { 2 }")
     );
+}
+
+#[test]
+fn item_keys_match_by_name() {
+    assert!(item_keys("fn foo() {}").contains(&ItemKey::Fn("foo".into())));
+    assert!(item_keys("pub async fn foo() {}").contains(&ItemKey::Fn("foo".into())));
+    assert!(item_keys("struct Foo;").contains(&ItemKey::Struct("Foo".into())));
+    assert!(item_keys("impl Foo {}").contains(&ItemKey::Impl {
+        self_ty: "Foo".into(),
+        trait_: None,
+    }));
+    assert!(item_keys("impl Debug for Foo {}").contains(&ItemKey::Impl {
+        self_ty: "Foo".into(),
+        trait_: Some("Debug".into()),
+    }));
+    assert!(item_keys("fn foo() {}").is_disjoint(&item_keys("fn bar() {}")));
 }

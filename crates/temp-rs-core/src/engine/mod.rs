@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use temp_rs_compiler::{
     driver::compile_cdylib,
     generator::generate_source,
-    parser::{InputKind, classify_input, is_persistent_binding},
+    parser::{InputKind, classify_input, is_persistent_binding, item_keys},
 };
 use temp_rs_dylib_loader::loader::MiniLoader;
 use tempfile::TempDir;
@@ -48,7 +48,16 @@ pub extern "C" fn __repl_eval(_ctx: *mut std::ffi::c_void) {}
     pub fn eval(&mut self, snippet: &str) -> Result<()> {
         let kind = classify_input(snippet);
 
-        let source = generate_source(&kind, &self.item_history, &self.binding_history);
+        let replaced_items;
+        let items = match &kind {
+            InputKind::Item(code) => {
+                replaced_items = items_without_conflicts(&self.item_history, code);
+                replaced_items.as_slice()
+            }
+            _ => self.item_history.as_slice(),
+        };
+
+        let source = generate_source(&kind, items, &self.binding_history);
 
         // The published dylib keeps a stable inode. Unmap it before that file
         // is overwritten, or dyld will keep executing the previous mapping.
@@ -66,7 +75,7 @@ pub extern "C" fn __repl_eval(_ctx: *mut std::ffi::c_void) {}
         self.loader = Some(loader);
 
         match kind {
-            InputKind::Item(code) => self.item_history.push(code),
+            InputKind::Item(code) => upsert_item(&mut self.item_history, code),
             InputKind::Statement(code) | InputKind::Expression(code)
                 if is_persistent_binding(&code) =>
             {
@@ -77,4 +86,24 @@ pub extern "C" fn __repl_eval(_ctx: *mut std::ffi::c_void) {}
 
         Ok(())
     }
+}
+
+fn items_without_conflicts(history: &[String], new: &str) -> Vec<String> {
+    let keys = item_keys(new);
+    if keys.is_empty() {
+        return history.to_vec();
+    }
+    history
+        .iter()
+        .filter(|old| item_keys(old).is_disjoint(&keys))
+        .cloned()
+        .collect()
+}
+
+fn upsert_item(history: &mut Vec<String>, new: String) {
+    let keys = item_keys(&new);
+    if !keys.is_empty() {
+        history.retain(|old| item_keys(old).is_disjoint(&keys));
+    }
+    history.push(new);
 }

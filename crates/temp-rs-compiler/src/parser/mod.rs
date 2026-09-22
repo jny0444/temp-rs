@@ -1,4 +1,6 @@
-use syn::{BinOp, Expr, Item, Stmt};
+use std::collections::HashSet;
+
+use syn::{BinOp, Expr, Item, Path, Stmt, Type, UseTree};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum InputKind {
@@ -113,4 +115,113 @@ fn parses_as_stmt(src: &str) -> Option<Stmt> {
     syn::parse_str(src)
         .ok()
         .or_else(|| syn::parse_str(&format!("{src};")).ok())
+}
+
+/// Identity of a crate-level item, used to replace rather than duplicate.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ItemKey {
+    Fn(String),
+    Struct(String),
+    Enum(String),
+    Union(String),
+    Trait(String),
+    Type(String),
+    Const(String),
+    Static(String),
+    Mod(String),
+    Macro(String),
+    Use(String),
+    Impl {
+        self_ty: String,
+        trait_: Option<String>,
+    },
+}
+
+/// Keys for every item in `src` (one snippet may contain several).
+pub fn item_keys(src: &str) -> HashSet<ItemKey> {
+    let mut keys = HashSet::new();
+    if let Ok(file) = syn::parse_str::<syn::File>(src) {
+        for item in file.items {
+            if let Some(key) = item_key(&item) {
+                keys.insert(key);
+            }
+        }
+        return keys;
+    }
+    if let Ok(item) = syn::parse_str::<Item>(src)
+        && let Some(key) = item_key(&item)
+    {
+        keys.insert(key);
+    }
+    keys
+}
+
+fn item_key(item: &Item) -> Option<ItemKey> {
+    Some(match item {
+        Item::Fn(item) => ItemKey::Fn(item.sig.ident.to_string()),
+        Item::Struct(item) => ItemKey::Struct(item.ident.to_string()),
+        Item::Enum(item) => ItemKey::Enum(item.ident.to_string()),
+        Item::Union(item) => ItemKey::Union(item.ident.to_string()),
+        Item::Trait(item) => ItemKey::Trait(item.ident.to_string()),
+        Item::TraitAlias(item) => ItemKey::Trait(item.ident.to_string()),
+        Item::Type(item) => ItemKey::Type(item.ident.to_string()),
+        Item::Const(item) => ItemKey::Const(item.ident.to_string()),
+        Item::Static(item) => ItemKey::Static(item.ident.to_string()),
+        Item::Mod(item) => ItemKey::Mod(item.ident.to_string()),
+        Item::Macro(item) => ItemKey::Macro(
+            item.ident
+                .as_ref()
+                .map(|id| id.to_string())
+                .or_else(|| item.mac.path.get_ident().map(|id| id.to_string()))?,
+        ),
+        Item::Use(item) => ItemKey::Use(use_key(&item.tree)),
+        Item::Impl(item) => ItemKey::Impl {
+            self_ty: type_key(&item.self_ty),
+            trait_: item.trait_.as_ref().map(|(path, _)| path_key(path)),
+        },
+        _ => return None,
+    })
+}
+
+fn path_key(path: &Path) -> String {
+    path.segments
+        .iter()
+        .map(|seg| seg.ident.to_string())
+        .collect::<Vec<_>>()
+        .join("::")
+}
+
+fn type_key(ty: &Type) -> String {
+    match ty {
+        Type::Path(ty) => path_key(&ty.path),
+        Type::Reference(ty) => {
+            let mut_ = if ty.mutability.is_some() { "mut " } else { "" };
+            format!("&{mut_}{}", type_key(&ty.elem))
+        }
+        Type::Slice(ty) => format!("[{}]", type_key(&ty.elem)),
+        Type::Array(ty) => format!("[{}]", type_key(&ty.elem)),
+        Type::Ptr(ty) => format!("*{}", type_key(&ty.elem)),
+        Type::Paren(ty) => type_key(&ty.elem),
+        Type::Tuple(ty) => {
+            let inner = ty.elems.iter().map(type_key).collect::<Vec<_>>().join(",");
+            format!("({inner})")
+        }
+        Type::Never(_) => "!".into(),
+        Type::Infer(_) => "_".into(),
+        _ => "_".into(),
+    }
+}
+
+fn use_key(tree: &UseTree) -> String {
+    match tree {
+        UseTree::Path(path) => format!("{}::{}", path.ident, use_key(&path.tree)),
+        UseTree::Name(name) => name.ident.to_string(),
+        UseTree::Rename(rename) => format!("{} as {}", rename.ident, rename.rename),
+        UseTree::Glob(_) => "*".into(),
+        UseTree::Group(group) => {
+            let mut parts: Vec<_> = group.items.iter().map(use_key).collect();
+            parts.sort();
+            parts.join(",")
+        }
+    }
 }

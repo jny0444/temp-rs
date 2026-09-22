@@ -24,6 +24,26 @@ fn eval_item_then_expression() {
 }
 
 #[test]
+fn eval_redefines_fn() {
+    let mut engine = Engine::new().unwrap();
+    engine.eval("fn answer() -> i32 { 1 }").unwrap();
+    engine.eval("fn answer() -> i32 { 2 }").unwrap();
+    engine.eval("answer()").unwrap();
+}
+
+#[test]
+fn eval_redefines_struct() {
+    let mut engine = Engine::new().unwrap();
+    engine
+        .eval("#[derive(Debug)] struct Point { x: i32 }")
+        .unwrap();
+    engine
+        .eval("#[derive(Debug)] struct Point { x: i32, y: i32 }")
+        .unwrap();
+    engine.eval("Point { x: 1, y: 2 }").unwrap();
+}
+
+#[test]
 fn eval_statement() {
     let mut engine = Engine::new().unwrap();
     engine.eval("let _x = 1").unwrap();
