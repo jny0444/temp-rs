@@ -25,6 +25,19 @@ fn compile_cdylib_writes_library() {
     assert_eq!(artifact.dylib_path, dir.path().join(dylib_filename(0)));
 }
 
+#[cfg(target_os = "macos")]
+#[test]
+fn repeated_compile_reuses_dylib_inode() {
+    use std::os::unix::fs::MetadataExt;
+
+    let dir = tempfile::tempdir().unwrap();
+    let first = compile_cdylib(eval_source(), 0, dir.path()).unwrap();
+    let inode = std::fs::metadata(&first.dylib_path).unwrap().ino();
+    let second = compile_cdylib(eval_source(), 1, dir.path()).unwrap();
+    assert_eq!(first.dylib_path, second.dylib_path);
+    assert_eq!(inode, std::fs::metadata(&second.dylib_path).unwrap().ino());
+}
+
 #[test]
 fn compile_cdylib_surfaces_rustc_errors() {
     let dir = tempfile::tempdir().unwrap();
