@@ -7,6 +7,16 @@ fn eval_expression() {
 }
 
 #[test]
+fn eval_braced_struct_with_trailing_semicolon_then_construct() {
+    let mut engine = Engine::new().unwrap();
+    engine
+        .eval("#[derive(Debug)]\nstruct A {\n    n: u8,\n};")
+        .unwrap();
+    engine.eval("let a = A { n: 10 };").unwrap();
+    engine.eval("a").unwrap();
+}
+
+#[test]
 fn eval_item_then_expression() {
     let mut engine = Engine::new().unwrap();
     engine.eval("fn double(x: i32) -> i32 { x * 2 }").unwrap();

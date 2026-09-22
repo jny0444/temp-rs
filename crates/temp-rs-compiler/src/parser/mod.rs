@@ -10,8 +10,8 @@ pub enum InputKind {
 pub fn classify_input(raw: &str) -> InputKind {
     let trimmed = raw.trim();
 
-    if is_item(trimmed) {
-        return InputKind::Item(trimmed.to_string());
+    if let Some(item) = item_source(trimmed) {
+        return InputKind::Item(item);
     }
 
     if is_statement(trimmed) {
@@ -19,6 +19,24 @@ pub fn classify_input(raw: &str) -> InputKind {
     }
 
     InputKind::Expression(trimmed.to_string())
+}
+
+/// Item text to replay at crate root.
+///
+/// A braced item with an extra trailing `;` (`struct A { n: u8 };`) is not a
+/// valid crate-level item. Drop that semicolon when the rest parses as an item.
+/// Semicolons that belong to the item (`struct Foo;`, `const N: i32 = 1;`) stay.
+fn item_source(src: &str) -> Option<String> {
+    if is_item(src) {
+        return Some(src.to_string());
+    }
+
+    let stripped = src.trim_end_matches(';').trim_end();
+    if stripped.len() < src.len() && is_item(stripped) {
+        Some(stripped.to_string())
+    } else {
+        None
+    }
 }
 
 fn is_item(src: &str) -> bool {

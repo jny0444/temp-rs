@@ -36,6 +36,15 @@ fn classifies_items() {
         classify_input("macro_rules! m { () => {} }"),
         item("macro_rules! m { () => {} }")
     );
+    assert_eq!(
+        classify_input("struct A {\n    n: u8,\n};"),
+        item("struct A {\n    n: u8,\n}")
+    );
+    assert_eq!(
+        classify_input("#[derive(Debug)]\nstruct A {\n    n: u8,\n};"),
+        item("#[derive(Debug)]\nstruct A {\n    n: u8,\n}")
+    );
+    assert_eq!(classify_input("fn foo() {};"), item("fn foo() {}"));
 }
 
 #[test]
